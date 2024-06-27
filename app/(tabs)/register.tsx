@@ -12,11 +12,15 @@ import {
   Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebaseConfig';
+import { setDoc, doc } from 'firebase/firestore';
+import { auth, db } from '../../firebaseConfig';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
-const LoginScreen: React.FC = () => {
+const RegisterScreen: React.FC = () => {
+  const [name, setName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
+  const [roomNumber, setRoomNumber] = useState('');
   const [password, setPassword] = useState('');
   const colorScheme = useColorScheme();
   const router = useRouter();
@@ -32,21 +36,26 @@ const LoginScreen: React.FC = () => {
     }).start();
   }, [fadeAnim]);
 
-  const handleLogin = async () => {
+  const handleRegister = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      console.log('User logged in successfully');
-      // Navigate to the main app screen
-      router.push('/home');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+  
+      // Store user data in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        name,
+        phoneNumber,
+        email,
+        roomNumber,
+        // Add any other fields you want to store
+      });
+  
+      console.log('User registered and data stored successfully');
+      // Navigate to the email verification or home screen
+      router.push('/verification');
     } catch (error: any) {
-      Alert.alert('Login Error', error.message);
+      Alert.alert('Registration Error', error.message);
     }
-  };
-
-  const handleForgotPassword = () => {
-    console.log('Forgot password');
-    // Navigate to forgot password screen
-    // router.push('/forgotPassword');
   };
 
   return (
@@ -62,8 +71,26 @@ const LoginScreen: React.FC = () => {
         ]}
       >
         <Text style={[styles.title, isDarkMode ? styles.darkText : styles.lightText]}>
-          Login
+          Register
         </Text>
+        
+        <TextInput
+          style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]}
+          placeholder="Name"
+          placeholderTextColor={isDarkMode ? "#888" : "#666"}
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+        />
+
+        <TextInput
+          style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]}
+          placeholder="Phone Number"
+          placeholderTextColor={isDarkMode ? "#888" : "#666"}
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
+        />
         
         <TextInput
           style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]}
@@ -77,6 +104,14 @@ const LoginScreen: React.FC = () => {
         
         <TextInput
           style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]}
+          placeholder="Room Number"
+          placeholderTextColor={isDarkMode ? "#888" : "#666"}
+          value={roomNumber}
+          onChangeText={setRoomNumber}
+        />
+        
+        <TextInput
+          style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]}
           placeholder="Password"
           placeholderTextColor={isDarkMode ? "#888" : "#666"}
           value={password}
@@ -86,15 +121,9 @@ const LoginScreen: React.FC = () => {
         
         <TouchableOpacity 
           style={[styles.button, isDarkMode ? styles.darkButton : styles.lightButton]} 
-          onPress={handleLogin}
+          onPress={handleRegister}
         >
-          <Text style={styles.buttonText}>Login</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleForgotPassword}>
-          <Text style={[styles.forgotPassword, isDarkMode ? styles.darkText : styles.lightText]}>
-            Forgot Password?
-          </Text>
+          <Text style={styles.buttonText}>Register</Text>
         </TouchableOpacity>
       </Animated.View>
     </KeyboardAvoidingView>
@@ -159,9 +188,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  forgotPassword: {
-    fontSize: 16,
-  },
   lightText: {
     color: '#000000',
   },
@@ -170,4 +196,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default RegisterScreen;

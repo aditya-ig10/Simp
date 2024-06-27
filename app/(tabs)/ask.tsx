@@ -19,12 +19,12 @@ const AskScreen: React.FC = () => {
 
   const handleNewUser = () => {
     console.log('Navigating to new user registration');
-    // router.push('/register');
+    router.push('/register');
   };
 
   const handleExistingUser = () => {
     console.log('Navigating to login');
-    // router.push('/login');
+    router.push('/login');
   };
 
   return (
