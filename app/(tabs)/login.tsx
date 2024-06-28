@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../firebaseConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -34,9 +35,10 @@ const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      await AsyncStorage.setItem('userToken', user.uid);
       console.log('User logged in successfully');
-      // Navigate to the main app screen
       router.push('/home');
     } catch (error: any) {
       Alert.alert('Login Error', error.message);
@@ -45,8 +47,7 @@ const LoginScreen: React.FC = () => {
 
   const handleForgotPassword = () => {
     console.log('Forgot password');
-    // Navigate to forgot password screen
-    // router.push('/forgotPassword');
+    Alert.alert('Not Active', 'Coming Soon in next Update. Contact Admin if you forgot your password for now!');
   };
 
   return (

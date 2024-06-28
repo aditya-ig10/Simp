@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, useColorScheme } from 'react-native';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, useColorScheme, TouchableOpacity, Alert } from 'react-native';
+import { collection, query, orderBy, onSnapshot, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 
 interface Notification {
@@ -40,7 +40,7 @@ const NotificationsScreen = () => {
       const notificationsList: Notification[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate() || new Date() // Provide a fallback date
+        timestamp: doc.data().timestamp?.toDate() || new Date() 
       } as Notification));
       
       setNotifications(notificationsList);
@@ -53,13 +53,55 @@ const NotificationsScreen = () => {
     return () => unsubscribe();
   }, []);
 
+  const clearAllNotifications = async () => {
+    Alert.alert(
+      "Clear All Notifications",
+      "Are you sure you want to clear all notifications?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        { 
+          text: "OK", 
+          onPress: async () => {
+            setLoading(true);
+            const batch = writeBatch(db);
+            notifications.forEach((notification) => {
+              const notificationRef = doc(db, 'notifications', notification.id);
+              batch.delete(notificationRef);
+            });
+            
+            try {
+              await batch.commit();
+              setNotifications([]);
+            } catch (error) {
+              console.error("Error clearing notifications: ", error);
+              Alert.alert("Error", "Failed to clear notifications. Please try again.");
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   if (loading) {
     return <ActivityIndicator size="large" color={colors.text} />;
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Notifications</Text>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>Notifications</Text>
+        <TouchableOpacity 
+          style={[styles.clearButton, { backgroundColor: colors.itemBackground }]} 
+          onPress={clearAllNotifications}
+        >
+          <Text style={{ color: colors.text }}>Clear All</Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {notifications.map((item) => (
           <View key={item.id} style={[styles.notificationItem, { backgroundColor: colors.itemBackground, borderColor: colors.itemBorder }]}>
@@ -78,6 +120,18 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 50, 
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  clearButton: {
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+  },
+  
   scrollContent: {
     flexGrow: 1,
   },

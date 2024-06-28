@@ -81,7 +81,7 @@ const EmailVerificationScreen: React.FC = () => {
       <Text style={[styles.message, isDarkMode ? styles.darkText : styles.lightText]}>
         {isVerified 
           ? 'Your email has been verified!' 
-          : 'Please verify your email to continue.'}
+          : 'Please verify your email to continue, or you can proceed to login after verifying email.'}
       </Text>
       
       {!isVerified && (

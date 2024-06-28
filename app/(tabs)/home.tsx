@@ -1,18 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert, Image, TextInput, useColorScheme, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, Image, TextInput, useColorScheme, ScrollView, Modal, Linking } from 'react-native';
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { useUserData } from '../../hooks/useUserData';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
 const items = [
   { name: 'Maggie', image: require('../../assets/maggie.webp') },
   { name: 'Coffee', image: require('../../assets/coffee.jpg') },
   { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
-  { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
-  { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
-  { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
+  { name: 'Milk Powder', image: require('../../assets/milk_pow.jpg') },
+  { name: 'Namkeen', image: require('../../assets/namkeen.jpeg') },
+  { name: 'Biscuits', image: require('../../assets/biscuit.jpg') },
+  { name: 'Iron', image: require('../../assets/iron.jpg') },
+  { name: 'Kettle', image: require('../../assets/kettle.webp') },
+  { name: 'Induction', image: require('../../assets/induction.webp') },
+  { name: 'Mixer', image: require('../../assets/mixer.jpg') },
+  { name: 'Heater', image: require('../../assets/heater.jpg') },
+  { name: 'Immersion Rod', image: require('../../assets/imrod.webp') },
+  { name: 'Bulb', image: require('../../assets/bulb.webp') },
+  { name: 'Charger', image: require('../../assets/chargerc.jpg') },
+  { name: 'Charger (Lightning Port)', image: require('../../assets/lc.jpg') },
+  { name: 'Wireless Charger', image: require('../../assets/wc.webp') },
+  { name: 'Power Bank', image: require('../../assets/pb.jpg') },
+  { name: 'TWS Earphones', image: require('../../assets/tws.jpg') },
+  { name: 'Headphones', image: require('../../assets/hp.webp') },
+  { name: 'Console Remote', image: require('../../assets/cr.jpg') },
+  { name: 'Pen Drive', image: require('../../assets/pd.webp') },
+  { name: 'OTG (Type C)', image: require('../../assets/otg.jpg') },
+  { name: 'HDMI Cable', image: require('../../assets/hdmi.jpg') },
+  { name: 'White Paper', image: require('../../assets/wp.jpg') },
+  { name: 'Fevicol', image: require('../../assets/fc.jpeg') },
+  { name: 'Scissors', image: require('../../assets/sc.webp') },
+  { name: 'Soap', image: require('../../assets/soap.jpg') },
+  { name: 'Shampoo', image: require('../../assets/shampoo.jpg') },
+  { name: 'Dettol', image: require('../../assets/det.jpg') },
+  { name: 'Pefume', image: require('../../assets/perf.webp') },
+  { name: 'Hair Wax', image: require('../../assets/wax.jpg') },
+  { name: 'Hair Oil', image: require('../../assets/oil.jpeg') },
+  { name: 'Trimmer', image: require('../../assets/tr.jpg') },
+  { name: 'Comb', image: require('../../assets/comb.jpg') },
+  { name: 'Belt', image: require('../../assets/belt.jpg') },
 ];
 
 const colorTheme = {
@@ -35,6 +65,7 @@ const Home = () => {
   const [message, setMessage] = useState('');
   const [messageLoading, setMessageLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isInfoModalVisible, setInfoModalVisible] = useState(false);
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = colorTheme[colorScheme || 'light'];
@@ -50,7 +81,11 @@ const Home = () => {
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Implement logout functionality here');
+    auth.signOut().then(() => router.push('/login'));
+  };
+
+  const openLink = (url: string) => {
+    Linking.openURL(url).catch((err) => console.error('An error occurred', err));
   };
 
   const sendNotification = async (itemName: string) => {
@@ -62,7 +97,7 @@ const Home = () => {
     try {
       const notificationsRef = collection(db, 'notifications');
       await addDoc(notificationsRef, {
-        message: `${userData.name} of Room ${userData.roomNumber} has requested for ${itemName}`,
+        message: `${userData.name} of Room: ${userData.roomNumber} and Phone Number: ${userData.phoneNumber}, has requested for ${itemName}`,
         timestamp: serverTimestamp(),
         userId: auth.currentUser?.uid
       });
@@ -72,7 +107,6 @@ const Home = () => {
       Alert.alert('Error', 'Failed to send request.');
     }
   };
-  
 
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -95,6 +129,9 @@ const Home = () => {
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Hello {userData.name},</Text>
         <View style={styles.iconContainer}>
+          <TouchableOpacity onPress={() => setInfoModalVisible(true)} style={styles.icon}>
+            <Ionicons name="information-circle-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleNotificationPress} style={styles.icon}>
             <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
@@ -129,6 +166,46 @@ const Home = () => {
           ))}
         </ScrollView>
       </View>
+      {isInfoModalVisible && (
+        <BlurView
+          style={StyleSheet.absoluteFill}
+          intensity={20}
+          tint={'systemUltraThinMaterial'}
+        />
+      )}
+       <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isInfoModalVisible}
+        onRequestClose={() => setInfoModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalView, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>About</Text>
+            <Text style={[styles.modalText, { color: colors.text }]}>SimpApp- by Aditya</Text>
+            <View style={styles.socialIcons}>
+              <TouchableOpacity onPress={() => openLink('https://github.com/aditya-ig10')} style={styles.socialIcon}>
+                <Ionicons name="logo-github" size={30} color={colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => openLink('https://www.linkedin.com/in/as0097')} style={styles.socialIcon}>
+                <Ionicons name="logo-linkedin" size={30} color={colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => openLink('https://instagram.com/xy_afk')} style={styles.socialIcon}>
+                <Ionicons name="logo-instagram" size={30} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.modalSub, { color: colors.text }]}>Hello Guys! Aditya this side and I hope tum logo ko app acha lag rha hoga, 
+              I just want to inform ki app abhi bhi development me hai and further updates me as per your need mai features add kar dunga!
+            </Text>
+            <TouchableOpacity
+              style={[styles.closeButton, { backgroundColor: '#9C24FF' }]}
+              onPress={() => setInfoModalVisible(false)}
+            >
+              <Text style={styles.textStyle}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -137,7 +214,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    paddingTop: 40,
+    paddingTop: 50,
   },
   header: {
     flexDirection: 'row',
@@ -212,6 +289,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalView: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    height: '50%',
+  },
+  modalTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
+  },
+  modalText: {
+    marginTop: 20,
+    textAlign: 'center',
+    fontSize: 22,
+  },
+  modalSub: {
+    marginTop: 20,
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  closeButton: {
+    borderRadius: 10,
+    padding: 10,
+    width: 200,
+    elevation: 2,
+    marginTop: "15%",
+  },
+  textStyle: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  socialIcons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  socialIcon: {
+    marginHorizontal: 10,
   },
 });
 
