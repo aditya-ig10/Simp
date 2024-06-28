@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Alert, Image, TextInput, useColorScheme, ScrollView } from 'react-native';
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { useUserData } from '../../hooks/useUserData';
@@ -8,15 +8,36 @@ import { Ionicons } from '@expo/vector-icons';
 
 const items = [
   { name: 'Maggie', image: require('../../assets/maggie.webp') },
-  { name: 'Coffee', image: require('../../assets/maggie.webp') },
-  { name: 'Milk', image: require('../../assets/maggie.webp') },
+  { name: 'Coffee', image: require('../../assets/coffee.jpg') },
+  { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
+  { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
+  { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
+  { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
 ];
+
+const colorTheme = {
+  light: {
+    text: '#333333',
+    background: '#FFFFFF',
+    searchBar: '#EEEEEE',
+    itemBorder: '#DDDDDD',
+  },
+  dark: {
+    text: '#FFFFFF',
+    background: '#000',
+    searchBar: '#262626',
+    itemBorder: '#444444',
+  },
+};
 
 const Home = () => {
   const { userData, loading: userLoading, isAdmin: userError } = useUserData();
   const [message, setMessage] = useState('');
   const [messageLoading, setMessageLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = colorTheme[colorScheme || 'light'];
 
   useEffect(() => {
     console.log('Home component mounted');
@@ -26,6 +47,10 @@ const Home = () => {
 
   const handleNotificationPress = () => {
     router.push('/notifications');
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Implement logout functionality here');
   };
 
   const sendNotification = async (itemName: string) => {
@@ -47,43 +72,62 @@ const Home = () => {
       Alert.alert('Error', 'Failed to send request.');
     }
   };
+  
+
+  const filteredItems = items.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (userLoading) {
-    return <ActivityIndicator size="large" color="#0000ff" />;
+    return <ActivityIndicator size="large" color={colors.text} />;
   }
 
   if (userError) {
-    return <Text>Error: {userError}</Text>;
+    return <Text style={[styles.errorText, { color: colors.text }]}>Error: {userError}</Text>;
   }
 
   if (!userData) {
-    return <Text>User not found</Text>;
+    return <Text style={[styles.errorText, { color: colors.text }]}>User not found</Text>;
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Heyy {userData.name}</Text>
-        <TouchableOpacity onPress={handleNotificationPress} style={styles.notificationIcon}>
-          <Ionicons name="notifications-outline" size={24} color="black" />
-        </TouchableOpacity>
+        <Text style={[styles.title, { color: colors.text }]}>Hello {userData.name},</Text>
+        <View style={styles.iconContainer}>
+          <TouchableOpacity onPress={handleNotificationPress} style={styles.icon}>
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.icon}>
+            <Ionicons name="log-out-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.main}>
-        <Text>Hello from my firestore: {message}</Text>
-        {items.map((item, index) => (
-          <View key={index} style={styles.itemContainer}>
-            <View style={styles.itemInfo}>
-              <Image source={item.image} style={styles.itemImage} />
-              <Text style={styles.itemName}>{item.name}</Text>
+        <Text style={[styles.sub, { color: colors.text }]}>Welcome to SimpApp</Text>
+        <TextInput
+          style={[styles.searchBar, { backgroundColor: colors.searchBar, color: colors.text }]}
+          placeholder="Search items..."
+          placeholderTextColor={colors.text}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {filteredItems.map((item, index) => (
+            <View key={index} style={[styles.itemContainer, { borderColor: colors.itemBorder }]}>
+              <View style={styles.itemInfo}>
+                <Image source={item.image} style={styles.itemImage} />
+                <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.button} 
+                onPress={() => sendNotification(item.name)}
+              >
+                <Text style={styles.buttonText}>Request this item</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={styles.button} 
-              onPress={() => sendNotification(item.name)}
-            >
-              <Text style={styles.buttonText}>Request this item</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+          ))}
+        </ScrollView>
       </View>
     </View>
   );
@@ -93,30 +137,47 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    paddingTop: 40,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
-  notificationIcon: {
+  sub: {
+    fontSize: 17,
+    marginBottom: 20,
+  },
+  iconContainer: {
+    flexDirection: 'row',
+  },
+  icon: {
     padding: 5,
+    marginLeft: 10,
   },
   main: {
     flex: 1,
+  },
+  searchBar: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginBottom: 20,
   },
   itemContainer: {
     flexDirection: 'column',
     alignItems: 'center',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 10,
     padding: 10,
   },
@@ -128,6 +189,7 @@ const styles = StyleSheet.create({
   itemImage: {
     width: 50,
     height: 50,
+    borderRadius: 50,
     marginRight: 10,
   },
   itemName: {
@@ -145,6 +207,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
 
