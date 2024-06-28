@@ -55,8 +55,8 @@ const NotificationsScreen = () => {
 
   const clearAllNotifications = async () => {
     Alert.alert(
-      "Clear All Notifications",
-      "Are you sure you want to clear all notifications?",
+      "System",
+      "Are you sure you want to clear all notifications? This will clear notifications from the server too!",
       [
         {
           text: "Cancel",

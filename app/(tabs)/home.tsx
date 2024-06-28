@@ -11,7 +11,7 @@ const items = [
   { name: 'Maggie', image: require('../../assets/maggie.webp') },
   { name: 'Coffee', image: require('../../assets/coffee.jpg') },
   { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
-  { name: 'Milk Powder', image: require('../../assets/milk_pow.jpg') },
+    { name: 'Milk Powder', image: require('../../assets/milk_pow.jpg') },
   { name: 'Namkeen', image: require('../../assets/namkeen.jpeg') },
   { name: 'Biscuits', image: require('../../assets/biscuit.jpg') },
   { name: 'Iron', image: require('../../assets/iron.jpg') },
