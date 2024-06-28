@@ -42,18 +42,23 @@ const RegisterScreen: React.FC = () => {
       const user = userCredential.user;
   
       // Store user data in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        name,
-        phoneNumber,
-        email,
-        roomNumber,
-        // Add any other fields you want to store
-      });
-  
-      console.log('User registered and data stored successfully');
-      // Navigate to the email verification or home screen
-      router.push('/verification');
+      try {
+        await setDoc(doc(db, "users", user.uid), {
+          name,
+          phoneNumber,
+          email,
+          roomNumber,
+          // Add any other fields you want to store
+        });
+        console.log('User registered and data stored successfully');
+        // Navigate to the email verification or home screen
+        router.push('/verification');
+      } catch (firestoreError: any) {
+        console.error('Error storing user data:', firestoreError);
+        Alert.alert('Registration Error', 'User account created, but there was an error storing additional data. Please contact support.');
+      }
     } catch (error: any) {
+      console.error('Registration error:', error);
       Alert.alert('Registration Error', error.message);
     }
   };
