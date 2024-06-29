@@ -9,12 +9,15 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  Alert,
+  Image
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { setDoc, doc } from 'firebase/firestore';
-import { auth, db } from '../../firebaseConfig';
+import { auth, db, storage } from '../../firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import * as ImagePicker from 'expo-image-picker';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const RegisterScreen: React.FC = () => {
   const [name, setName] = useState('');
@@ -22,6 +25,7 @@ const RegisterScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const colorScheme = useColorScheme();
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -34,12 +38,44 @@ const RegisterScreen: React.FC = () => {
       duration: 1000,
       useNativeDriver: true,
     }).start();
+
+    (async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Sorry, we need camera roll permissions to make this work!');
+      }
+    })();
   }, [fadeAnim]);
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setProfilePhoto(result.assets[0].uri);
+    }
+  };
+
+  const uploadImage = async (uri: string, uid: string) => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const storageRef = ref(storage, `profilePhotos/${uid}`);
+    await uploadBytes(storageRef, blob);
+    return await getDownloadURL(storageRef);
+  };
 
   const handleRegister = async () => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      let photoURL = null;
+      if (profilePhoto) {
+        photoURL = await uploadImage(profilePhoto, user.uid);
+      }
   
       // Store user data in Firestore
       try {
@@ -48,6 +84,7 @@ const RegisterScreen: React.FC = () => {
           phoneNumber,
           email,
           roomNumber,
+          photoURL,
           // Add any other fields you want to store
         });
         console.log('User registered and data stored successfully');
@@ -78,6 +115,18 @@ const RegisterScreen: React.FC = () => {
         <Text style={[styles.title, isDarkMode ? styles.darkText : styles.lightText]}>
           Register
         </Text>
+
+        <TouchableOpacity onPress={pickImage} style={styles.photoContainer}>
+          {profilePhoto ? (
+            <Image source={{ uri: profilePhoto }} style={styles.profilePhoto} />
+          ) : (
+            <View style={[styles.photoPlaceholder, isDarkMode ? styles.darkPhotoPlaceholder : styles.lightPhotoPlaceholder]}>
+              <Text style={[styles.photoPlaceholderText, isDarkMode ? styles.darkText : styles.lightText]}>
+                Add Photo
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
         
         <TextInput
           style={[styles.input, isDarkMode ? styles.darkInput : styles.lightInput]}
@@ -198,6 +247,34 @@ const styles = StyleSheet.create({
   },
   darkText: {
     color: '#ffffff',
+  },
+  photoContainer: {
+    marginBottom: 20,
+  },
+  profilePhoto: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  photoPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  lightPhotoPlaceholder: {
+    borderColor: '#ccc',
+    backgroundColor: '#f0f0f0',
+  },
+  darkPhotoPlaceholder: {
+    borderColor: '#555',
+    backgroundColor: '#333',
+  },
+  photoPlaceholderText: {
+    fontSize: 14,
   },
 });
 

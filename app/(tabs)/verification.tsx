@@ -62,7 +62,7 @@ const EmailVerificationScreen: React.FC = () => {
       // Navigate to the main app screen
       router.push('/home');
     } else {
-      Alert.alert('Email Not Verified', 'Please verify your email before continuing.');
+      Alert.alert('Email Not Verified', 'Please verify your email before continuing or if you have verified please close the app and try logging in!');
     }
   };
 
@@ -89,7 +89,7 @@ const EmailVerificationScreen: React.FC = () => {
           style={[styles.button, isDarkMode ? styles.darkButton : styles.lightButton]} 
           onPress={handleSendVerificationEmail}
         >
-          <Text style={styles.buttonText}>Resend Verification Email</Text>
+          <Text style={styles.buttonText}>Send Verification Email</Text>
         </TouchableOpacity>
       )}
       

@@ -1,0 +1,57 @@
+buildscript {
+    ext {
+        buildToolsVersion = '34.0.0'
+        minSdkVersion = 23
+        compileSdkVersion = 34
+        targetSdkVersion = 34
+        kotlinVersion = '1.9.23'
+        ndkVersion = '26.1.10909125'
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.0.2'
+        classpath 'com.facebook.react:react-native-gradle-plugin:0.71.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+    }
+}
+
+apply plugin: "com.android.application"
+apply plugin: "com.android.library"
+apply plugin: "com.facebook.react"
+apply plugin: "kotlin-android"
+
+android {
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+
+    defaultConfig {
+        applicationId "com.example.yourappid"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+allprojects {
+    repositories {
+        maven {
+            url new File('node_modules/react-native/android').toURI().toURL()
+        }
+        maven {
+            url new File('node_modules/jsc-android/dist').toURI().toURL()
+        }
+        google()
+        mavenCentral()
+        maven { url 'https://www.jitpack.io' }
+    }
+}

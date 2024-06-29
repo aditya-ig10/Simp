@@ -11,38 +11,6 @@ const items = [
   { name: 'Maggie', image: require('../../assets/maggie.webp') },
   { name: 'Coffee', image: require('../../assets/coffee.jpg') },
   { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
-    { name: 'Milk Powder', image: require('../../assets/milk_pow.jpg') },
-  { name: 'Namkeen', image: require('../../assets/namkeen.jpeg') },
-  { name: 'Biscuits', image: require('../../assets/biscuit.jpg') },
-  { name: 'Iron', image: require('../../assets/iron.jpg') },
-  { name: 'Kettle', image: require('../../assets/kettle.webp') },
-  { name: 'Induction', image: require('../../assets/induction.webp') },
-  { name: 'Mixer', image: require('../../assets/mixer.jpg') },
-  { name: 'Heater', image: require('../../assets/heater.jpg') },
-  { name: 'Immersion Rod', image: require('../../assets/imrod.webp') },
-  { name: 'Bulb', image: require('../../assets/bulb.webp') },
-  { name: 'Charger', image: require('../../assets/chargerc.jpg') },
-  { name: 'Charger (Lightning Port)', image: require('../../assets/lc.jpg') },
-  { name: 'Wireless Charger', image: require('../../assets/wc.webp') },
-  { name: 'Power Bank', image: require('../../assets/pb.jpg') },
-  { name: 'TWS Earphones', image: require('../../assets/tws.jpg') },
-  { name: 'Headphones', image: require('../../assets/hp.webp') },
-  { name: 'Console Remote', image: require('../../assets/cr.jpg') },
-  { name: 'Pen Drive', image: require('../../assets/pd.webp') },
-  { name: 'OTG (Type C)', image: require('../../assets/otg.jpg') },
-  { name: 'HDMI Cable', image: require('../../assets/hdmi.jpg') },
-  { name: 'White Paper', image: require('../../assets/wp.jpg') },
-  { name: 'Fevicol', image: require('../../assets/fc.jpeg') },
-  { name: 'Scissors', image: require('../../assets/sc.webp') },
-  { name: 'Soap', image: require('../../assets/soap.jpg') },
-  { name: 'Shampoo', image: require('../../assets/shampoo.jpg') },
-  { name: 'Dettol', image: require('../../assets/det.jpg') },
-  { name: 'Pefume', image: require('../../assets/perf.webp') },
-  { name: 'Hair Wax', image: require('../../assets/wax.jpg') },
-  { name: 'Hair Oil', image: require('../../assets/oil.jpeg') },
-  { name: 'Trimmer', image: require('../../assets/tr.jpg') },
-  { name: 'Comb', image: require('../../assets/comb.jpg') },
-  { name: 'Belt', image: require('../../assets/belt.jpg') },
 ];
 
 const colorTheme = {
@@ -61,11 +29,11 @@ const colorTheme = {
 };
 
 const Home = () => {
-  const { userData, loading: userLoading, isAdmin: userError } = useUserData();
-  const [message, setMessage] = useState('');
-  const [messageLoading, setMessageLoading] = useState(true);
+  const { userData, loading: userLoading, loading: userError } = useUserData();
   const [searchQuery, setSearchQuery] = useState('');
   const [isInfoModalVisible, setInfoModalVisible] = useState(false);
+  const [hasNewNotification, setHasNewNotification] = useState(false);
+  const [hasNewMessage, setHasNewMessage] = useState(false);
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = colorTheme[colorScheme || 'light'];
@@ -77,7 +45,13 @@ const Home = () => {
   }, [userLoading, userData]);
 
   const handleNotificationPress = () => {
+    setHasNewNotification(false);
     router.push('/notifications');
+  };
+
+  const handleGlobalChat = () => {
+    setHasNewMessage(false);
+    router.push('/chats');
   };
 
   const handleLogout = () => {
@@ -127,16 +101,28 @@ const Home = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Hello {userData.name},</Text>
+        <View style={styles.userInfo}>
+          {userData.photoURL ? (
+            <Image 
+              source={{ uri: userData.photoURL }} 
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={[styles.avatar, styles.defaultAvatar]}>
+              <Text style={styles.defaultAvatarText}>{userData.name[0]}</Text>
+            </View>
+          )}
+          <View>
+            <Text style={[styles.greeting, { color: colors.text }]}>Hello 👋</Text>
+            <Text style={[styles.userName, { color: colors.text }]}>{userData.name}</Text>
+          </View>
+        </View>
         <View style={styles.iconContainer}>
-          <TouchableOpacity onPress={() => setInfoModalVisible(true)} style={styles.icon}>
-            <Ionicons name="information-circle-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
           <TouchableOpacity onPress={handleNotificationPress} style={styles.icon}>
-            <Ionicons name="notifications-outline" size={24} color={colors.text} />
+            <Ionicons name="notifications" size={24} color={hasNewNotification ? 'red' : colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout} style={styles.icon}>
-            <Ionicons name="log-out-outline" size={24} color={colors.text} />
+          <TouchableOpacity onPress={handleGlobalChat} style={styles.icon}>
+            <Ionicons name="chatbubbles" size={24} color={hasNewMessage ? 'red' : colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -173,7 +159,7 @@ const Home = () => {
           tint={'systemUltraThinMaterial'}
         />
       )}
-       <Modal
+      <Modal
         animationType="slide"
         transparent={true}
         visible={isInfoModalVisible}
@@ -220,13 +206,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 1,
+    marginBottom: 20,
   },
   scrollContent: {
     flexGrow: 1,
   },
-  title: {
-    fontSize: 24,
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  defaultAvatar: {
+    backgroundColor: '#9C24FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  defaultAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  greeting: {
+    fontSize: 14,
+  },
+  userName: {
+    fontSize: 18,
     fontWeight: 'bold',
   },
   sub: {

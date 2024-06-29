@@ -4,6 +4,7 @@ import { doc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 
 interface UserData {
+  photoURL: string;
   name: string;
   phoneNumber: string;
   email: string;
@@ -17,17 +18,14 @@ export const useUserData = () => {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    console.log('useUserData effect running');
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      console.log('Auth state changed:', user ? 'User logged in' : 'No user');
       if (user) {
         const userDoc = doc(db, 'users', user.uid);
         const unsubscribeSnapshot = onSnapshot(userDoc, async (doc) => {
-          console.log('User document snapshot received');
           if (doc.exists()) {
             const userData = doc.data() as UserData;
             setUserData(userData);
-            
+
             // Check if user is admin
             try {
               const adminsCollection = collection(db, 'admins');
@@ -36,7 +34,6 @@ export const useUserData = () => {
               setIsAdmin(adminEmails.includes(userData.email));
             } catch (error) {
               console.error('Error checking admin status:', error);
-              // Set isAdmin to false if there's an error
               setIsAdmin(false);
             }
           } else {
@@ -59,8 +56,6 @@ export const useUserData = () => {
 
     return () => unsubscribeAuth();
   }, []);
-
-  console.log('useUserData state:', { userData, loading, isAdmin });
 
   return { userData, loading, isAdmin };
 };
