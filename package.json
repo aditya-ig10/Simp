@@ -50,7 +50,8 @@
     "react-native-vector-icons": "^10.1.0",
     "react-native-web": "~0.19.10",
     "expo-notifications": "~0.28.9",
-    "undefined": "firebase/messaging"
+    "undefined": "firebase/messaging",
+    "expo-linear-gradient": "~13.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

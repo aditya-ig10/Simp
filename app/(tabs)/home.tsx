@@ -1,34 +1,111 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, Image, TextInput, useColorScheme, ScrollView, Modal, Linking } from 'react-native';
-import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Alert, Image, TextInput, useColorScheme, Modal, Linking, FlatList } from 'react-native';
+import { collection, getDocs, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { useUserData } from '../../hooks/useUserData';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { ImageSourcePropType } from 'react-native';
 
-const items = [
+interface Item {
+  name: string;
+  image: ImageSourcePropType;
+}
+
+const items: Item[] = [
   { name: 'Maggie', image: require('../../assets/maggie.webp') },
   { name: 'Coffee', image: require('../../assets/coffee.jpg') },
   { name: 'Amul Milk', image: require('../../assets/milk.jpg') },
+  { name: 'Milk Powder', image: require('../../assets/milk_pow.jpg') },
+  { name: 'Namkeen', image: require('../../assets/namkeen.jpeg') },
+  { name: 'Biscuits', image: require('../../assets/biscuit.jpg') },
+  { name: 'Iron', image: require('../../assets/iron.jpg') },
+  { name: 'Kettle', image: require('../../assets/kettle.webp') },
+  { name: 'Induction', image: require('../../assets/induction.webp') },
+  { name: 'Mixer', image: require('../../assets/mixer.jpg') },
+  { name: 'Heater', image: require('../../assets/heater.jpg') },
+  { name: 'Immersion Rod', image: require('../../assets/imrod.webp') },
+  { name: 'Bulb', image: require('../../assets/bulb.webp') },
+  { name: 'Charger', image: require('../../assets/chargerc.jpg') },
+  { name: 'Charger (Lightning Port)', image: require('../../assets/lc.jpg') },
+  { name: 'Wireless Charger', image: require('../../assets/wc.webp') },
+  { name: 'Power Bank', image: require('../../assets/pb.jpg') },
+  { name: 'TWS Earphones', image: require('../../assets/tws.jpg') },
+  { name: 'Headphones', image: require('../../assets/hp.webp') },
+  { name: 'Console Remote', image: require('../../assets/cr.jpg') },
+  { name: 'Pen Drive', image: require('../../assets/pd.webp') },
+  { name: 'OTG (Type C)', image: require('../../assets/otg.jpg') },
+  { name: 'HDMI Cable', image: require('../../assets/hdmi.jpg') },
+  { name: 'White Paper', image: require('../../assets/wp.jpg') },
+  { name: 'Fevicol', image: require('../../assets/fc.jpeg') },
+  { name: 'Scissors', image: require('../../assets/sc.webp') },
+  { name: 'Soap', image: require('../../assets/soap.jpg') },
+  { name: 'Shampoo', image: require('../../assets/shampoo.jpg') },
+  { name: 'Dettol', image: require('../../assets/det.jpg') },
+  { name: 'Pefume', image: require('../../assets/perf.webp') },
+  { name: 'Hair Wax', image: require('../../assets/wax.jpg') },
+  { name: 'Hair Oil', image: require('../../assets/oil.jpeg') },
+  { name: 'Trimmer', image: require('../../assets/tr.jpg') },
+  { name: 'Comb', image: require('../../assets/comb.jpg') },
+  { name: 'Belt', image: require('../../assets/belt.jpg') },
 ];
 
-const colorTheme = {
+interface ColorTheme {
+  text: string;
+  subtext: string;
+  background: string;
+  searchBar: string;
+  itemBorder: string;
+  itemBackground: string;
+  placeholderText: string;
+}
+
+const colorTheme: { light: ColorTheme; dark: ColorTheme } = {
   light: {
     text: '#333333',
+    subtext: '#666666',
     background: '#FFFFFF',
     searchBar: '#EEEEEE',
     itemBorder: '#DDDDDD',
+    itemBackground: '#F5F5F5',
+    placeholderText: '#999999',
   },
   dark: {
     text: '#FFFFFF',
-    background: '#000',
+    subtext: '#D0D0D0',
+    background: '#000000',
     searchBar: '#262626',
     itemBorder: '#444444',
+    itemBackground: '#1C1C1E',
+    placeholderText: '#666666',
   },
 };
 
-const Home = () => {
+const ItemSeparator = () => <View style={styles.separator} />;
+
+interface RenderItemProps {
+  item: Item;
+  onPress: (itemName: string) => void;
+  colors: ColorTheme;
+}
+
+const RenderItem: React.FC<RenderItemProps> = React.memo(({ item, onPress, colors }) => (
+  <View style={[styles.itemContainer, { backgroundColor: colors.itemBackground }]}>
+    <Image source={item.image} style={styles.itemImage} />
+    <View style={styles.itemDetails}>
+      <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
+      <TouchableOpacity 
+        style={styles.requestButton} 
+        onPress={() => onPress(item.name)}
+      >
+        <Text style={styles.requestButtonText}>+</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+));
+
+const Home: React.FC = () => {
   const { userData, loading: userLoading, loading: userError } = useUserData();
   const [searchQuery, setSearchQuery] = useState('');
   const [isInfoModalVisible, setInfoModalVisible] = useState(false);
@@ -38,20 +115,47 @@ const Home = () => {
   const colorScheme = useColorScheme();
   const colors = colorTheme[colorScheme || 'light'];
 
+
   useEffect(() => {
     console.log('Home component mounted');
     console.log('User loading:', userLoading);
     console.log('Current user:', auth.currentUser?.uid);
   }, [userLoading, userData]);
 
+  useEffect(() => {
+    const unsubscribeNotifications = onSnapshot(collection(db, 'notifications'), (snapshot) => {
+      const hasNew = snapshot.docChanges().some(change => change.type === 'added' && change.doc.data().userId !== auth.currentUser?.uid);
+      if (hasNew) {
+        setHasNewNotification(true);
+      }
+    });
+  
+    const unsubscribeMessages = onSnapshot(collection(db, 'messages'), (snapshot) => {
+      const hasNew = snapshot.docChanges().some(change => change.type === 'added' && change.doc.data().userId !== auth.currentUser?.uid);
+      if (hasNew) {
+        setHasNewMessage(true);
+      }
+    });
+  
+    return () => {
+      unsubscribeNotifications();
+      unsubscribeMessages();
+    };
+  }, []);
+
   const handleNotificationPress = () => {
     setHasNewNotification(false);
     router.push('/notifications');
   };
-
+  
   const handleGlobalChat = () => {
     setHasNewMessage(false);
     router.push('/chats');
+  };
+
+  const handleProfile = () => {
+    setHasNewMessage(false);
+    router.push('/profile');
   };
 
   const handleLogout = () => {
@@ -67,7 +171,7 @@ const Home = () => {
       Alert.alert('Error', 'User data not available');
       return;
     }
-
+  
     try {
       const notificationsRef = collection(db, 'notifications');
       await addDoc(notificationsRef, {
@@ -75,6 +179,7 @@ const Home = () => {
         timestamp: serverTimestamp(),
         userId: auth.currentUser?.uid
       });
+      setHasNewNotification(true);
       Alert.alert('Success', `Request for ${itemName} sent successfully!`);
     } catch (error) {
       console.error('Error sending notification:', error);
@@ -82,9 +187,23 @@ const Home = () => {
     }
   };
 
-  const filteredItems = items.filter(item =>
+  const filteredItems: Item[] = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const renderItem = useCallback(({ item }: { item: Item }) => (
+    <RenderItem item={item} onPress={sendNotification} colors={colors} />
+  ), [colors, sendNotification]);
+
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: 150,
+    offset: 150 * index,
+    index,
+  }), []);
+
+  // const filteredItems: Item[] = items.filter(item =>
+  //   item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  // );
 
   if (userLoading) {
     return <ActivityIndicator size="large" color={colors.text} />;
@@ -101,7 +220,7 @@ const Home = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <View style={styles.userInfo}>
+        <TouchableOpacity onPress={handleProfile} style={styles.userInfo}>
           {userData.photoURL ? (
             <Image 
               source={{ uri: userData.photoURL }} 
@@ -113,44 +232,56 @@ const Home = () => {
             </View>
           )}
           <View>
-            <Text style={[styles.greeting, { color: colors.text }]}>Hello 👋</Text>
+            <Text style={[styles.greeting, { color: colors.text }]}>Have a great day 👋</Text>
             <Text style={[styles.userName, { color: colors.text }]}>{userData.name}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <View style={styles.iconContainer}>
-          <TouchableOpacity onPress={handleNotificationPress} style={styles.icon}>
-            <Ionicons name="notifications" size={24} color={hasNewNotification ? 'red' : colors.text} />
+          <TouchableOpacity onPress={handleNotificationPress} style={styles.iconWrapper}>
+            <Ionicons 
+              name="notifications-outline" 
+              size={24} 
+              color={colors.text} 
+            />
+            {hasNewNotification && <View style={styles.notificationDot} />}
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleGlobalChat} style={styles.icon}>
-            <Ionicons name="chatbubbles" size={24} color={hasNewMessage ? 'red' : colors.text} />
+          <TouchableOpacity onPress={handleGlobalChat} style={styles.iconWrapper}>
+            <Ionicons 
+              name="chatbubble-ellipses-outline" 
+              size={24} 
+              color={colors.text} 
+            />
+            {hasNewMessage && <View style={styles.notificationDot} />}
           </TouchableOpacity>
         </View>
       </View>
       <View style={styles.main}>
-        <Text style={[styles.sub, { color: colors.text }]}>Welcome to SimpApp</Text>
-        <TextInput
-          style={[styles.searchBar, { backgroundColor: colors.searchBar, color: colors.text }]}
-          placeholder="Search items..."
-          placeholderTextColor={colors.text}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
+        <Text style={[styles.welcomeText, { color: colors.text }]}>Welcome to SimpApp</Text>
+        <Text style={[styles.subText, { color: colors.subtext }]}>Browse and request items you need from your hostel mates!</Text>
+        <View style={[styles.searchBarContainer, { backgroundColor: colors.searchBar }]}>
+          <Ionicons name="search" size={20} color={colors.text} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchBar, { color: colors.text }]}
+            placeholder="Search items..."
+            placeholderTextColor={colors.placeholderText}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        <Text style={[styles.sub, { color: colors.text, marginTop: 10 }]}>Item List</Text>
+        <FlatList
+          data={filteredItems}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.name}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          ItemSeparatorComponent={ItemSeparator}
+          getItemLayout={getItemLayout}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
         />
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {filteredItems.map((item, index) => (
-            <View key={index} style={[styles.itemContainer, { borderColor: colors.itemBorder }]}>
-              <View style={styles.itemInfo}>
-                <Image source={item.image} style={styles.itemImage} />
-                <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.button} 
-                onPress={() => sendNotification(item.name)}
-              >
-                <Text style={styles.buttonText}>Request this item</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </ScrollView>
       </View>
       {isInfoModalVisible && (
         <BlurView
@@ -208,8 +339,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  scrollContent: {
-    flexGrow: 1,
+  separator: {
+    height: 20,
+  },
+  row: {
+    justifyContent: 'space-between',
+  },
+  itemContainer: {
+    width: '48%',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  itemImage: {
+    width: '100%',
+    height: 100,
+    resizeMode: 'cover',
+  },
+  itemDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+  },
+  itemName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  requestButton: {
+    backgroundColor: '#4d4dff',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  requestButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   avatar: {
     width: 40,
@@ -227,10 +394,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   greeting: {
     fontSize: 14,
   },
@@ -238,12 +401,41 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  welcomeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'left',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   sub: {
     fontSize: 17,
+    fontWeight: 'bold',
     marginBottom: 20,
+  },
+  subText: {
+    fontSize: 15,
+    marginBottom: 20,
+    marginTop: 5,
   },
   iconContainer: {
     flexDirection: 'row',
+  },
+  iconWrapper: {
+    padding: 5,
+    marginLeft: 10,
+    position: 'relative',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FF3B30',
   },
   icon: {
     padding: 5,
@@ -252,38 +444,25 @@ const styles = StyleSheet.create({
   main: {
     flex: 1,
   },
-  searchBar: {
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 20,
-  },
-  itemContainer: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-  },
-  itemInfo: {
+  searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  itemImage: {
-    width: 50,
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    marginBottom: 15,
     height: 50,
-    borderRadius: 50,
+  },
+  searchIcon: {
     marginRight: 10,
   },
-  itemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  searchBar: {
+    flex: 1,
+    height: '100%',
+    fontSize: 16,
   },
+
   button: {
-    backgroundColor: '#9C24FF',
+    backgroundColor: '#4d4dff',
     padding: 15,
     borderRadius: 5,
     alignItems: 'center',

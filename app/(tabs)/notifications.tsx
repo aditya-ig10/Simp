@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, useColorScheme, TouchableOpacity, Alert } from 'react-native';
 import { collection, query, orderBy, onSnapshot, doc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
+import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
 interface Notification {
   id: string;
@@ -16,13 +18,15 @@ const colorTheme = {
     itemBackground: '#f0f0f0',
     itemBorder: '#DDDDDD',
     timestamp: '#888',
+    headerBackground: '#F2F2F7',
   },
   dark: {
     text: '#FFFFFF',
     background: '#000',
-    itemBackground: '#262626',
+    itemBackground: '#0A0A0A',
     itemBorder: '#444444',
     timestamp: '#aaa',
+    headerBackground: '#1C1C1E',
   },
 };
 
@@ -55,15 +59,16 @@ const NotificationsScreen = () => {
 
   const clearAllNotifications = async () => {
     Alert.alert(
-      "System",
-      "Are you sure you want to clear all notifications? This will clear notifications from the server too!",
+      "Clear Notifications",
+      "Are you sure you want to clear all notifications? This action cannot be undone.",
       [
         {
           text: "Cancel",
           style: "cancel"
         },
         { 
-          text: "OK", 
+          text: "Clear", 
+          style: "destructive",
           onPress: async () => {
             setLoading(true);
             const batch = writeBatch(db);
@@ -88,27 +93,38 @@ const NotificationsScreen = () => {
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" color={colors.text} />;
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.text} />
+      </View>
+    );
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+      <BlurView intensity={30} style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Notifications</Text>
-        <TouchableOpacity 
-          style={[styles.clearButton, { backgroundColor: colors.itemBackground }]} 
-          onPress={clearAllNotifications}
-        >
-          <Text style={{ color: colors.text }}>Clear All</Text>
+        <TouchableOpacity onPress={clearAllNotifications}>
+          <Ionicons name="trash-outline" size={24} color={colors.text} />
         </TouchableOpacity>
-      </View>
+      </BlurView>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {notifications.map((item) => (
-          <View key={item.id} style={[styles.notificationItem, { backgroundColor: colors.itemBackground, borderColor: colors.itemBorder }]}>
-            <Text style={{ color: colors.text }}>{item.message}</Text>
-            <Text style={[styles.timestamp, { color: colors.timestamp }]}>{item.timestamp.toLocaleString()}</Text>
+        {notifications.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="notifications-off-outline" size={50} color={colors.timestamp} />
+            <Text style={[styles.emptyStateText, { color: colors.timestamp }]}>No notifications</Text>
           </View>
-        ))}
+        ) : (
+          notifications.map((item) => (
+            <View key={item.id} style={[styles.notificationItem, { backgroundColor: colors.itemBackground, borderColor: colors.itemBorder }]}>
+              <Ionicons name="notifications-outline" size={24} color={colors.text} style={styles.notificationIcon} />
+              <View style={styles.notificationContent}>
+                <Text style={[styles.notificationMessage, { color: colors.text }]}>{item.message}</Text>
+                <Text style={[styles.timestamp, { color: colors.timestamp }]}>{item.timestamp.toLocaleString()}</Text>
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -117,38 +133,52 @@ const NotificationsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    paddingTop: 50, 
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    padding: 20,
+    paddingTop: 50,
   },
-  clearButton: {
-    padding: 10,
-    marginBottom: 10,
-    borderRadius: 5,
-  },
-  
   scrollContent: {
     flexGrow: 1,
+    padding: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
   },
   notificationItem: {
+    flexDirection: 'row',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 10,
     marginBottom: 10,
     borderWidth: 1,
+    alignItems: 'center',
+  },
+  notificationIcon: {
+    marginRight: 15,
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationMessage: {
+    fontSize: 16,
   },
   timestamp: {
     fontSize: 12,
     marginTop: 5,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  emptyStateText: {
+    marginTop: 10,
+    fontSize: 18,
   },
 });
 

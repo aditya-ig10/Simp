@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, useColorScheme, Modal, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image, useColorScheme, Modal, Dimensions, Alert, ActivityIndicator, ViewStyle } from 'react-native';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, deleteDoc } from 'firebase/firestore';
-import { db, auth } from '../../firebaseConfig';
+import { db, auth, storage } from '../../firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserData } from '../../hooks/useUserData';
-
+import * as ImagePicker from 'expo-image-picker';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+type BubbleStyle = ViewStyle & {
+    alignSelf?: 'flex-start' | 'flex-end' | 'center' | 'auto' | 'stretch';
+  };
 interface User {
   name: string;
   phoneNumber: string;
@@ -13,15 +17,16 @@ interface User {
 }
 
 interface Message {
-  _id: string;
-  createdAt: Date;
-  text: string;
-  user: {
     _id: string;
-    name: string;
-    photoURL?: string;
-  };
-}
+    createdAt: Date;
+    text?: string;
+    image?: string;
+    user: {
+      _id: string;
+      name: string;
+      photoURL?: string;
+    };
+  }
 
 interface UserProfileProps {
   visible: boolean;
@@ -86,15 +91,45 @@ const Chats = () => {
   const { userData, loading } = useUserData();
   const colorScheme = useColorScheme();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-
+  const [isLoading, setIsLoading] = useState(false);
+  const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
+  interface EnlargedImageModalProps {
+    imageUrl: string | null;
+    onClose: () => void;
+  }
+  
+  const EnlargedImageModal: React.FC<EnlargedImageModalProps> = ({ imageUrl, onClose }) => {
+    if (!imageUrl) return null;
+  
+    return (
+      <Modal
+        transparent={true}
+        visible={!!imageUrl}
+        onRequestClose={onClose}
+      >
+        <TouchableOpacity 
+          style={styles.enlargedImageOverlay} 
+          activeOpacity={1} 
+          onPress={onClose}
+        >
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.enlargedImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
   const theme = {
     background: colorScheme === 'dark' ? '#000000' : '#FFFFFF',
     text: colorScheme === 'dark' ? '#FFFFFF' : '#000000',
-    senderBubble: colorScheme === 'dark' ? '#0084FF' : '#0084FF',
+    senderBubble: colorScheme === 'dark' ? '#4d4dff' : '#4d4dff',
     receiverBubble: colorScheme === 'dark' ? '#303030' : '#E4E6EB',
     inputBackground: colorScheme === 'dark' ? '#303030' : '#F0F2F5',
     lightText: colorScheme === 'dark' ? '#888888' : '#999999',
     headerBackground: colorScheme === 'dark' ? '#1C1C1E' : '#F2F2F7',
+    sendButton: colorScheme === 'dark' ? '#1C1C1E' : '#F0F2F5',
   };
 
   useEffect(() => {
@@ -106,6 +141,7 @@ const Chats = () => {
             _id: doc.id,
             createdAt: doc.data().createdAt?.toDate() || new Date(),
             text: doc.data().text,
+            image: doc.data().image,
             user: doc.data().user,
           }))
         );
@@ -114,25 +150,37 @@ const Chats = () => {
       return () => unsubscribe();
     }
   }, [loading, userData]);
-
+  type RenderItemProps = {
+    item: Message;
+    index: number;
+  };
   const onSend = async () => {
     if (inputMessage.trim().length > 0 && auth.currentUser && userData) {
-      await addDoc(collection(db, 'messages'), {
-        text: inputMessage,
-        createdAt: serverTimestamp(),
-        user: {
-          _id: auth.currentUser.uid,
-          name: userData.name,
-          photoURL: userData.photoURL,
-        },
-      });
-      setInputMessage('');
+      setIsLoading(true);
+      try {
+        await addDoc(collection(db, 'messages'), {
+          text: inputMessage,
+          createdAt: serverTimestamp(),
+          user: {
+            _id: auth.currentUser.uid,
+            name: userData.name,
+            photoURL: userData.photoURL,
+          },
+        });
+        setInputMessage('');
+      } catch (error) {
+        console.error('Error sending message:', error);
+        Alert.alert('Error', 'Failed to send the message. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   const formatTimestamp = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
   const deleteMessage = async (messageId: string) => {
     try {
       await deleteDoc(doc(db, 'messages', messageId));
@@ -155,13 +203,66 @@ const Chats = () => {
     }
   };
 
-  const renderItem = ({ item, index }: { item: Message; index: number }) => {
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+  
+    if (!result.canceled && result.assets[0].uri) {
+      setIsLoading(true);
+      try {
+        const uri = result.assets[0].uri;
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const storageRef = ref(storage, `images/${new Date().getTime()}`);
+        await uploadBytes(storageRef, blob);
+        const downloadURL = await getDownloadURL(storageRef);
+    
+        if (auth.currentUser && userData) {
+          await addDoc(collection(db, 'messages'), {
+            image: downloadURL,
+            createdAt: serverTimestamp(),
+            user: {
+              _id: auth.currentUser.uid,
+              name: userData.name,
+              photoURL: userData.photoURL,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        Alert.alert('Error', 'Failed to upload the image. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const renderItem = ({ item, index }: RenderItemProps) => {
     const isMyMessage = item.user._id === auth.currentUser?.uid;
     const showAvatar = !isMyMessage && (index === messages.length - 1 || messages[index + 1].user._id !== item.user._id);
     const isLastInSequence = index === 0 || messages[index - 1].user._id !== item.user._id;
     const isFirstInSequence = index === messages.length - 1 || messages[index + 1].user._id !== item.user._id;
     const isMiddleMessage = !isFirstInSequence && !isLastInSequence;
-
+  
+    const bubbleStyle: BubbleStyle = {
+      ...styles.messageBubble,
+      ...(isMyMessage ? styles.senderBubble : styles.receiverBubble),
+      ...(isFirstInSequence && (isMyMessage ? styles.firstSenderBubble : styles.firstReceiverBubble)),
+      ...(isLastInSequence && (isMyMessage ? styles.lastSenderBubble : styles.lastReceiverBubble)),
+      ...(isMiddleMessage && (isMyMessage ? styles.middleSenderBubble : styles.middleReceiverBubble)),
+      ...(item.image && styles.imageBubble),
+      backgroundColor: isMyMessage ? theme.senderBubble : theme.receiverBubble,
+    };
+  
+    const handleImagePress = () => {
+      if (item.image) {
+        setEnlargedImage(item.image);
+      }
+    };
+  
     return (
       <TouchableOpacity
         onLongPress={() => handleLongPress(item)}
@@ -187,16 +288,19 @@ const Chats = () => {
             {!isMyMessage && showAvatar && (
               <Text style={[styles.senderName, { color: theme.lightText }]}>{item.user.name}</Text>
             )}
-            <View style={[
-              styles.messageBubble,
-              isMyMessage ? [styles.senderBubble, { backgroundColor: theme.senderBubble }] : [styles.receiverBubble, { backgroundColor: theme.receiverBubble }],
-              isFirstInSequence && (isMyMessage ? styles.firstSenderBubble : styles.firstReceiverBubble),
-              isLastInSequence && (isMyMessage ? styles.lastSenderBubble : styles.lastReceiverBubble),
-              isMiddleMessage && (isMyMessage ? styles.middleSenderBubble : styles.middleReceiverBubble),
-            ]}>
-              <Text style={[styles.messageText, { color: isMyMessage ? '#FFFFFF' : theme.text }]}>{item.text}</Text>
+            <View style={bubbleStyle}>
+              {item.text && <Text style={[styles.messageText, { color: isMyMessage ? '#FFFFFF' : theme.text }]}>{item.text}</Text>}
+              {item.image && (
+                <TouchableOpacity onPress={handleImagePress}>
+                  <Image 
+                    source={{ uri: item.image }} 
+                    style={styles.messageImage} 
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              )}
               <Text style={[styles.timestamp, { color: isMyMessage ? 'rgba(255,255,255,0.7)' : theme.lightText }]}>
-                {formatTimestamp(item.createdAt)}
+                {/* {formatTimestamp(item.createdAt)} */}
               </Text>
             </View>
           </View>
@@ -211,11 +315,14 @@ const Chats = () => {
         <Text style={[styles.title, { color: theme.text }]}>Global Chat</Text>
       </View>
       <FlatList
-        data={messages}
-        renderItem={({ item, index }) => renderItem({ item, index })}
-        keyExtractor={(item) => item._id}
-        inverted
-      />
+  data={messages}
+  renderItem={renderItem}
+  keyExtractor={(item) => item._id}
+  inverted
+  initialNumToRender={15}
+  maxToRenderPerBatch={10}
+  windowSize={10}
+/>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={100}
@@ -228,8 +335,15 @@ const Chats = () => {
           placeholder="Write a message..."
           placeholderTextColor={theme.lightText}
         />
-        <TouchableOpacity onPress={onSend} style={styles.sendButton}>
-          <Ionicons name="send" size={24} color="#0084FF" />
+        <TouchableOpacity onPress={pickImage} style={styles.ImagesendButton} disabled={isLoading}>
+          <Ionicons name="attach" size={24} color="#ffff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onSend} style={styles.sendButton} disabled={isLoading}>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Ionicons name="send" size={24} color="#ffff" />
+          )}
         </TouchableOpacity>
       </KeyboardAvoidingView>
       {selectedUserId && (
@@ -239,6 +353,10 @@ const Chats = () => {
           userId={selectedUserId}
         />
       )}
+      <EnlargedImageModal
+      imageUrl={enlargedImage}
+      onClose={() => setEnlargedImage(null)}
+    />
     </View>
   );
 };
@@ -257,6 +375,7 @@ const styles = StyleSheet.create({
   avatarContainer: {
     width: 40,
     marginRight: 8,
+    marginBottom: 2,
   },
   avatarPlaceholder: {
     width: 40,
@@ -274,11 +393,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   senderName: {
-    fontSize: 12,
+    fontSize: 0,
     marginBottom: 2,
     marginLeft: 12,
   },
-  
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -295,46 +413,69 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     maxWidth: windowWidth * 0.7,
   },
+  imageBubble: {
+    padding: 0,
+    overflow: 'hidden',
+    borderRadius: 20,
+    backgroundColor: "ffffff",
+  },
+  messageImage: {
+    width: 220,
+    height: 220,
+    borderRadius: 20,
+  },
+  imageLoader: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -12 }, { translateY: -12 }],
+    zIndex: 1,
+  },
+  bubblestyle: {
+    margin: 10,
+  },
   senderBubble: {
     alignSelf: 'flex-end',
-  },
+  } as BubbleStyle,
   receiverBubble: {
     alignSelf: 'flex-start',
-  },
+  } as BubbleStyle,
   firstSenderBubble: {
     borderTopRightRadius: 4,
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomRightRadius: 14,
   },
   lastSenderBubble: {
-    borderTopRightRadius: 20,
+    borderTopRightRadius: 8,
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 20,
+    marginBottom: 10,
   },
   middleSenderBubble: {
-    borderTopRightRadius: 4,
+    borderTopRightRadius: 14,
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 14,
   },
   firstReceiverBubble: {
     borderTopRightRadius: 20,
     borderTopLeftRadius: 4,
-    borderBottomLeftRadius: 20,
+    borderBottomLeftRadius: 14,
     borderBottomRightRadius: 20,
   },
   lastReceiverBubble: {
     borderTopRightRadius: 20,
-    borderTopLeftRadius: 20,
-    borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 14,
     borderBottomRightRadius: 20,
+    marginBottom: 10,
   },
   middleReceiverBubble: {
     borderTopRightRadius: 20,
-    borderTopLeftRadius: 4,
-    borderBottomLeftRadius: 4,
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
     borderBottomRightRadius: 20,
   },
   messageText: {
@@ -342,7 +483,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   timestamp: {
-    fontSize: 10,
+    fontSize: 0,
     alignSelf: 'flex-end',
     marginTop: 4,
   },
@@ -363,6 +504,15 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     padding: 10,
+    backgroundColor: '#4d4dff',
+    borderRadius: 40,
+    // marginRight: 10,
+  },
+  ImagesendButton: {
+    padding: 10,
+    backgroundColor: '#4d4dff',
+    borderRadius: 40,
+    marginRight: 10,
   },
   centeredView: {
     flex: 1,
@@ -392,7 +542,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalText: {
-    marginBottom: 15,
+    marginBottom: 10,
     textAlign: 'center',
     fontSize: 18,
   },
@@ -403,11 +553,22 @@ const styles = StyleSheet.create({
   },
   buttonClose: {
     backgroundColor: '#2196F3',
+    marginTop: 10,
   },
   textStyle: {
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  enlargedImageOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  enlargedImage: {
+    width: '90%',
+    height: '90%',
   },
 });
 

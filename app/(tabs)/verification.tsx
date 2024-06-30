@@ -6,7 +6,8 @@ import {
   TouchableOpacity, 
   useColorScheme, 
   Animated,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { sendEmailVerification, onAuthStateChanged, User } from 'firebase/auth';
@@ -14,6 +15,7 @@ import { auth } from '../../firebaseConfig';
 
 const EmailVerificationScreen: React.FC = () => {
   const [isVerified, setIsVerified] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const colorScheme = useColorScheme();
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -27,21 +29,31 @@ const EmailVerificationScreen: React.FC = () => {
       useNativeDriver: true,
     }).start();
 
+    const checkEmailVerification = async (user: User) => {
+      await user.reload();
+      setIsVerified(user.emailVerified);
+      setIsLoading(false);
+      if (user.emailVerified) {
+        router.push('/home');
+      }
+    };
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        setIsVerified(user.emailVerified);
+        checkEmailVerification(user);
+      } else {
+        setIsLoading(false);
       }
     });
 
     return () => unsubscribe();
-  }, [fadeAnim]);
+  }, [fadeAnim, router]);
 
   const handleSendVerificationEmail = async () => {
     const user = auth.currentUser;
     if (user) {
       try {
         await sendEmailVerification(user);
-        console.log('Verification email sent successfully');
         Alert.alert('Verification Email Sent', 'Please check your email inbox and spam folder.');
       } catch (error) {
         console.error('Error sending verification email:', error);
@@ -52,19 +64,30 @@ const EmailVerificationScreen: React.FC = () => {
         }
       }
     } else {
-      console.error('No user is currently signed in');
       Alert.alert('Error', 'No user is currently signed in.');
     }
   };
 
-  const handleContinue = () => {
-    if (isVerified) {
-      // Navigate to the main app screen
-      router.push('/home');
+  const handleContinue = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        router.push('/home');
+      } else {
+        Alert.alert('Email Not Verified', 'Please verify your email before continuing.');
+      }
     } else {
-      Alert.alert('Email Not Verified', 'Please verify your email before continuing or if you have verified please close the app and try logging in!');
+      Alert.alert('Error', 'No user is currently signed in.');
     }
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, isDarkMode ? styles.darkContainer : styles.lightContainer]}>
+        <ActivityIndicator size="large" color={isDarkMode ? '#C57EFF' : '#9C24FF'} />
+      </View>
+    );
+  }
 
   return (
     <Animated.View 
@@ -80,8 +103,8 @@ const EmailVerificationScreen: React.FC = () => {
       
       <Text style={[styles.message, isDarkMode ? styles.darkText : styles.lightText]}>
         {isVerified 
-          ? 'Your email has been verified!' 
-          : 'Please verify your email to continue, or you can proceed to login after verifying email.'}
+          ? 'Your email has been verified! You can now proceed to the main app.' 
+          : 'Please verify your email to continue. Check your inbox for a verification link.'}
       </Text>
       
       {!isVerified && (
@@ -97,7 +120,7 @@ const EmailVerificationScreen: React.FC = () => {
         style={[styles.button, isDarkMode ? styles.darkButton : styles.lightButton]} 
         onPress={handleContinue}
       >
-        <Text style={styles.buttonText}>Continue</Text>
+        <Text style={styles.buttonText}>{isVerified ? 'Continue to App' : 'Check Verification Status'}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -111,27 +134,29 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   darkContainer: {
-    backgroundColor: '#000',
+    backgroundColor: '#121212',
   },
   lightContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f5f5f5',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
   },
   message: {
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 30,
+    lineHeight: 24,
   },
   button: {
     width: '100%',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 10,
     alignItems: 'center',
     marginBottom: 20,
+    elevation: 3,
   },
   lightButton: {
     backgroundColor: '#9C24FF',
